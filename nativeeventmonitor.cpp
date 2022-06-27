@@ -1,6 +1,8 @@
 #include "nativeeventmonitor.h"
+#ifdef Q_OS_WIN
 #include "windows.h"
 #include "Dbt.h"
+#endif
 #include <QDebug>
 
 NativeEventMonitor::NativeEventMonitor(QObject *parent)
@@ -16,6 +18,7 @@ NativeEventMonitor::~NativeEventMonitor()
 
 bool NativeEventMonitor::nativeEventFilter(const QByteArray &eventType, void *message, long *result)
 {
+#ifdef Q_OS_WIN
     MSG *msg = reinterpret_cast<MSG *>(message);
     int type = msg->message;
 
@@ -26,5 +29,6 @@ bool NativeEventMonitor::nativeEventFilter(const QByteArray &eventType, void *me
         qDebug() <<"USB Removed!";
         emit useDeviceStateChanged(QString(), DeviceState::Removed_State);
     }
+#endif
     return false;
 }

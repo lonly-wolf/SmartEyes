@@ -7,45 +7,13 @@
 #include <QVideoProbe>
 #include <QVideoSurfaceFormat>
 
-static QString cameraKeyId("vid_2304");
+static QString cameraKeyId("0023044922");
 
 CameraHelper::CameraHelper(QObject *parent)
     : QObject(parent)
 {
     qRegisterMetaType<FrameInfo>("FrameInfo");
     m_monitor = new NativeEventMonitor;
-    m_cameraSwitchTimer = new QTimer(this);
-    m_cameraSwitchTimer->setInterval(1);
-    m_cameraSwitchTimer->setSingleShot(true);
-
-    connect(m_cameraSwitchTimer, &QTimer::timeout, this, [this](){
-        if (m_cameraArray.size() == 0)
-            return;
-
-        if (m_currentIndex >= m_cameraArray.size())
-            m_currentIndex = 0;
-
-        QString deviceName = m_cameraArray[m_currentIndex].deviceName;
-
-        foreach(auto info, m_cameraArray) {
-            if (info.deviceName != deviceName) {
-                info.camera->stop();
-                info.processor->stop();
-            }
-        };
-
-        foreach(auto info, m_cameraArray) {
-            if (info.deviceName == deviceName) {
-                QVideoSurfaceFormat format;;
-                format.setFrameRate(30);
-                format.setFrameSize(QSize(1920, 1080));
-                info.camera->start();
-                info.processor->start(format);
-            }
-        };
-
-        m_currentIndex ++;
-    });
 
     connect(m_monitor, &NativeEventMonitor::useDeviceStateChanged, this, &CameraHelper::onUSBStateChanged);
 }
@@ -63,8 +31,10 @@ void CameraHelper::initialCameraList()
     // load current exist camera
     QList<QCameraInfo> infos = QCameraInfo::availableCameras();
     foreach(auto it, infos) {
-        qDebug()  << it.deviceName();
-        appendOneCamera(it, static_cast<Direction>(infos.indexOf(it)));
+        if (it.deviceName().toLower().contains(cameraKeyId)) {
+            qDebug() << "Available Camera ID:" << it.deviceName();
+            appendOneCamera(it, static_cast<Direction>(m_cameraArray.size()));
+        }
 
         }
 }
@@ -72,25 +42,28 @@ void CameraHelper::initialCameraList()
 bool CameraHelper::openCamera(const QString &deviceName)
 {
     foreach(auto info, m_cameraArray) {
-        if (info.deviceName != deviceName) {
-            info.processor->stop();
-        }
-    }
-
-    foreach(auto info, m_cameraArray) {
         if (info.deviceName == deviceName) {
             info.camera->searchAndLock(QCamera::LockType::NoLock);
 
             QCameraViewfinderSettings settings = info.camera->viewfinderSettings();
             settings.setResolution(QSize(1920, 1080));
-            settings.setPixelFormat(QVideoFrame::Format_Jpeg);
-            info.camera->setViewfinderSettings(settings);
+            settings.setPixelFormat(QVideoFrame::Format_ARGB32);
+            settings.setMaximumFrameRate(10);
+
             info.camera->start();
+
+            info.camera->setViewfinderSettings(settings);
+
+//            auto formats = info.camera->supportedViewfinderPixelFormats();
+//            foreach(auto it, formats) {
+//                qDebug() << "spuuort format:" << it;
+//            }
+
             QString errorString = info.camera->errorString();
             qWarning() <<errorString;
 
             QVideoSurfaceFormat format;;
-            format.setFrameRate(30);
+            format.setFrameRate(10);
             format.setFrameSize(QSize(1920, 1080));
             info.processor->start(format);
             info.camera->unlock();
@@ -183,7 +156,7 @@ bool CameraHelper::autoOpenEnabled() const
 void CameraHelper::appendOneCamera(const QCameraInfo &info2, Direction direction)
 {
     if (info2.deviceName().toLower().contains(cameraKeyId)) {
-        QCamera *camera = new QCamera(info2.deviceName().toUtf8(), this);
+        QCamera *camera = new QCamera(info2, this);
 
         CameraInfo info;
         info.camera =camera;
@@ -198,13 +171,16 @@ void CameraHelper::appendOneCamera(const QCameraInfo &info2, Direction direction
             VideoSurfaceProcessor *d = reinterpret_cast<VideoSurfaceProcessor *>(sender());
             foreach(auto it, m_cameraArray) {
                 if (it.processor == d) {
-                    QImage view(frame.bits(),frame.width(), frame.height(), QImage::Format_ARGB32);
+                    //qDebug() << "format1:" << frame.pixelFormat();
+                    //qDebug() << "format2:" << frame.imageFormatFromPixelFormat(frame.pixelFormat());
+                    QImage view(frame.bits(),frame.width(), frame.height(),  QImage::Format_RGB32);
                     emit oneFrameReady(FrameInfo(it.deviceName, it.direction, view));
-                    m_cameraSwitchTimer->start();
+                    break;
                 }
             }
         });
 
+        qDebug() << "Find One Camera:" << info.deviceName << " direction:" << static_cast<int>(direction);
         m_cameraArray.append(info);
 
         // Auto Open

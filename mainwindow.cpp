@@ -17,8 +17,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_counter = new FrameRateCounter(this);
 
     connect(m_cameraHelper, &CameraHelper::oneFrameReady, this, [this](const CameraHelper::FrameInfo &info){
-        qDebug() << "One Frame Ready!" << info.image.size();
+        // qDebug() << "One Frame Ready!" << info.image.size() << " direction:" << static_cast<int>(info.direction);
         m_imgMap[info.direction]->setPixmap(QPixmap::fromImage(info.image));
+        //m_imgBack->setPixmap(QPixmap::fromImage(info.image));
         m_counter->oneFrameReady();
     });
     connect(m_counter, &FrameRateCounter::frameChanged, this, [this](double rate){

@@ -66,7 +66,6 @@ private:
     QVector<CameraInfo> m_cameraArray;
     bool m_autoOpenEnabled {true};
     NativeEventMonitor *m_monitor;
-    QTimer *m_cameraSwitchTimer;
     int m_currentIndex {0};
 
     void appendOneCamera(const QCameraInfo &info2, Direction direction);
